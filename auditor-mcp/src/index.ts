@@ -1,0 +1,185 @@
+import { config as loadEnv } from "dotenv";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { wrapFetchWithPayment, x402Client, x402HTTPClient } from "@x402/fetch";
+import { z } from "zod";
+
+import { STELLAR_TESTNET_CAIP2, STELLAR_PUBNET_CAIP2 } from "./stellar/constants";
+import { ExactStellarScheme } from "./stellar/exact/client/scheme";
+import { createEd25519Signer } from "./stellar/signer";
+
+// ---------------------------------------------------------------------------
+// Bootstrap
+// ---------------------------------------------------------------------------
+
+const currentDir = dirname(fileURLToPath(import.meta.url));
+loadEnv({ path: resolve(currentDir, "..", ".env") });
+
+function requireEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`Missing required env var: ${name}`);
+  return value;
+}
+
+const STELLAR_SECRET_KEY = requireEnv("STELLAR_SECRET_KEY");
+const AUDIT_GATEWAY_URL =
+  process.env.AUDIT_GATEWAY_URL?.trim() || "http://localhost:3001/api/audit";
+
+const rawNetwork = (process.env.STELLAR_NETWORK ?? STELLAR_TESTNET_CAIP2).trim();
+if (rawNetwork !== STELLAR_TESTNET_CAIP2 && rawNetwork !== STELLAR_PUBNET_CAIP2) {
+  throw new Error(`Unsupported STELLAR_NETWORK: ${rawNetwork}`);
+}
+const STELLAR_NETWORK = rawNetwork as typeof STELLAR_TESTNET_CAIP2 | typeof STELLAR_PUBNET_CAIP2;
+
+// ---------------------------------------------------------------------------
+// x402 payment client
+// ---------------------------------------------------------------------------
+
+const signer = createEd25519Signer(STELLAR_SECRET_KEY, STELLAR_NETWORK);
+
+const paymentClient = new x402Client().register(
+  "stellar:*",
+  new ExactStellarScheme(signer),
+);
+
+const httpClient = new x402HTTPClient(paymentClient);
+const fetchWithPayment = wrapFetchWithPayment(fetch, httpClient);
+
+// ---------------------------------------------------------------------------
+// MCP server
+// ---------------------------------------------------------------------------
+
+const server = new McpServer({
+  name: process.env.MCP_SERVER_NAME || "auditor-mcp",
+  version: process.env.MCP_SERVER_VERSION || "0.1.0",
+});
+
+server.tool(
+  "audit_soroban_contract",
+  [
+    "Reads a local Soroban smart contract (.rs file) and submits it for a paid security audit.",
+    "Charges 0.15 USDC on Stellar Testnet via the x402 protocol.",
+    "Returns a structured audit report with vulnerabilities, warnings, and recommendations.",
+  ].join(" "),
+  {
+    file_path: z
+      .string()
+      .describe("Absolute or relative path to the Soroban .rs contract file to audit"),
+  },
+  async ({ file_path }) => {
+    // 1. Read the contract file
+    let code: string;
+    try {
+      code = await readFile(file_path, "utf8");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        content: [{ type: "text", text: `Failed to read file "${file_path}": ${message}` }],
+        isError: true,
+      };
+    }
+
+    if (code.trim().length === 0) {
+      return {
+        content: [{ type: "text", text: `File "${file_path}" is empty.` }],
+        isError: true,
+      };
+    }
+
+    // 2. POST to auditor-backend — x402 payment handshake is handled automatically:
+    //    - fetchWithPayment sends the initial request
+    //    - if the server returns 402, it signs and submits 0.15 USDC on Stellar Testnet
+    //    - then retries with the payment receipt header
+    let response: Response;
+    try {
+      response = await fetchWithPayment(AUDIT_GATEWAY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Payment or network error calling auditor-backend: ${message}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const rawBody = await response.text();
+
+    if (!response.ok) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Auditor backend returned HTTP ${response.status}:\n${rawBody}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    // 3. Parse and surface the audit result
+    let report: { findings: unknown[]; model?: string; reasoning?: string } | null = null;
+    try {
+      report = JSON.parse(rawBody);
+    } catch {
+      return {
+        content: [{ type: "text", text: `Audit backend returned non-JSON response:\n${rawBody}` }],
+        isError: true,
+      };
+    }
+
+    const findings = report?.findings ?? [];
+    const counts: Record<string, number> = {};
+    if (Array.isArray(findings)) {
+      for (const f of findings as Array<{ severity: string }>) {
+        counts[f.severity] = (counts[f.severity] ?? 0) + 1;
+      }
+    }
+
+    const summary = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+      .filter((s) => counts[s])
+      .map((s) => `${s}: ${counts[s]}`)
+      .join(" | ");
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              file: file_path,
+              walletAddress: signer.address,
+              model: report?.model,
+              summary: summary || "No vulnerabilities found",
+              findings,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Start
+// ---------------------------------------------------------------------------
+
+const transport = new StdioServerTransport();
+await server.connect(transport);
+
+console.error("auditor-mcp running over stdio");
+console.error(`wallet : ${signer.address}`);
+console.error(`network: ${STELLAR_NETWORK}`);
+console.error(`gateway: ${AUDIT_GATEWAY_URL}`);
