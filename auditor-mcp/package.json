@@ -10,10 +10,12 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "@stellar/mpp": "^0.4.0",
     "@stellar/stellar-sdk": "^14.6.1",
     "@x402/core": "^2.8.0",
     "@x402/fetch": "^2.8.0",
     "dotenv": "^17.3.1",
+    "mppx": "^0.4.12",
     "zod": "^3.25.76"
   },
   "devDependencies": {
