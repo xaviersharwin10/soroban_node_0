@@ -3,3 +3,5 @@
 **/.env
 .claude/
 *.log
+CLAUDE.md
+HACKATHON.md
