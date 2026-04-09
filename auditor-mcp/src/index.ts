@@ -5,6 +5,8 @@ import { readFile } from "node:fs/promises";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { wrapFetchWithPayment, x402Client, x402HTTPClient } from "@x402/fetch";
+import { Mppx as MppxClient } from "mppx/client";
+import { stellar as stellarMpp } from "@stellar/mpp/charge/client";
 import { z } from "zod";
 
 import { STELLAR_TESTNET_CAIP2, STELLAR_PUBNET_CAIP2 } from "./stellar/constants";
@@ -27,6 +29,8 @@ function requireEnv(name: string): string {
 const STELLAR_SECRET_KEY = requireEnv("STELLAR_SECRET_KEY");
 const AUDIT_GATEWAY_URL =
   process.env.AUDIT_GATEWAY_URL?.trim() || "http://localhost:3001/api/audit";
+const MPP_GATEWAY_URL =
+  process.env.MPP_AUDIT_GATEWAY_URL?.trim() || "http://localhost:3001/api/audit/mpp";
 
 const rawNetwork = (process.env.STELLAR_NETWORK ?? STELLAR_TESTNET_CAIP2).trim();
 if (rawNetwork !== STELLAR_TESTNET_CAIP2 && rawNetwork !== STELLAR_PUBNET_CAIP2) {
@@ -47,6 +51,15 @@ const paymentClient = new x402Client().register(
 
 const httpClient = new x402HTTPClient(paymentClient);
 const fetchWithPayment = wrapFetchWithPayment(fetch, httpClient);
+
+// ---------------------------------------------------------------------------
+// Stellar MPP payment client
+// ---------------------------------------------------------------------------
+
+const mppClient = MppxClient.create({
+  methods: [stellarMpp.charge({ secretKey: STELLAR_SECRET_KEY })],
+  polyfill: false,
+});
 
 // ---------------------------------------------------------------------------
 // MCP server
@@ -158,6 +171,124 @@ server.tool(
           text: JSON.stringify(
             {
               file: file_path,
+              walletAddress: signer.address,
+              model: report?.model,
+              summary: summary || "No vulnerabilities found",
+              findings,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  },
+);
+
+// ---------------------------------------------------------------------------
+// MPP tool — audit_soroban_contract_mpp (Stripe MPP / Stellar)
+// ---------------------------------------------------------------------------
+
+server.tool(
+  "audit_soroban_contract_mpp",
+  [
+    "Reads a local Soroban smart contract (.rs file) and submits it for a paid security audit.",
+    "Charges 0.15 USDC on Stellar Testnet via the Stripe Machine Payments Protocol (MPP).",
+    "Returns a structured audit report with vulnerabilities, CWE IDs, severity levels, and fixes.",
+  ].join(" "),
+  {
+    file_path: z
+      .string()
+      .describe("Absolute or relative path to the Soroban .rs contract file to audit"),
+  },
+  async ({ file_path }) => {
+    let code: string;
+    try {
+      code = await readFile(file_path, "utf8");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        content: [{ type: "text", text: `Failed to read file "${file_path}": ${message}` }],
+        isError: true,
+      };
+    }
+
+    if (code.trim().length === 0) {
+      return {
+        content: [{ type: "text", text: `File "${file_path}" is empty.` }],
+        isError: true,
+      };
+    }
+
+    // mppClient.fetch handles the MPP 402 challenge automatically:
+    //   - receives HTTP 402 with Stellar payment challenge
+    //   - signs and submits 0.15 USDC SAC transfer on Stellar Testnet
+    //   - retries with the payment credential
+    let response: Response;
+    try {
+      response = await mppClient.fetch(MPP_GATEWAY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `MPP payment or network error: ${message}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const rawBody = await response.text();
+
+    if (!response.ok) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Auditor backend returned HTTP ${response.status}:\n${rawBody}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    let report: { findings: unknown[]; model?: string; reasoning?: string } | null = null;
+    try {
+      report = JSON.parse(rawBody);
+    } catch {
+      return {
+        content: [{ type: "text", text: `Audit backend returned non-JSON:\n${rawBody}` }],
+        isError: true,
+      };
+    }
+
+    const findings = report?.findings ?? [];
+    const counts: Record<string, number> = {};
+    if (Array.isArray(findings)) {
+      for (const f of findings as Array<{ severity: string }>) {
+        counts[f.severity] = (counts[f.severity] ?? 0) + 1;
+      }
+    }
+
+    const summary = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+      .filter((s) => counts[s])
+      .map((s) => `${s}: ${counts[s]}`)
+      .join(" | ");
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              file: file_path,
+              protocol: "Stripe MPP / Stellar Testnet",
               walletAddress: signer.address,
               model: report?.model,
               summary: summary || "No vulnerabilities found",
