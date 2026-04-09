@@ -6,6 +6,7 @@ import { ExactStellarScheme } from "@x402/stellar/exact/server";
 import { HTTPFacilitatorClient } from "@x402/core/server";
 import { auditContract } from "./auditor.js";
 import { demoAudit, type PaymentAsset } from "./demo.js";
+import { mppAuditPaywall } from "./mpp.js";
 
 const PORT = process.env.PORT ?? "3001";
 const STELLAR_ADDRESS = process.env.TESTNET_SERVER_STELLAR_ADDRESS ?? "";
@@ -103,6 +104,23 @@ app.post("/api/audit/demo", async (req, res) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Demo audit error:", message);
     res.status(502).json({ error: "Demo audit failed", detail: message });
+  }
+});
+
+// Stellar MPP endpoint — payment gated by @stellar/mpp + mppx
+app.post("/api/audit/mpp", mppAuditPaywall, async (req, res) => {
+  const { code } = req.body as { code?: string };
+  if (!code || typeof code !== "string" || code.trim().length === 0) {
+    res.status(400).json({ error: "Request body must include a non-empty 'code' field." });
+    return;
+  }
+  try {
+    const report = await auditContract(code);
+    res.json(report);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("MPP audit error:", message);
+    res.status(502).json({ error: "Audit failed", detail: message });
   }
 });
 
