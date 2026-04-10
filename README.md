@@ -32,59 +32,12 @@ An AI agent (Claude Code, or any MCP-compatible agent) reads your Soroban `.rs` 
 
 ## Value Propositions
 
-### Scenario 1 — DeFi Protocol Launch
-
-**Real World Scenario:** A DeFi team ships a Soroban lending protocol. A security audit from Trail of Bits or OpenZeppelin costs $20,000–$80,000 and takes 4–8 weeks. They can't afford to wait — the hackathon or launch window is now.
-
-**Action:** They configure the auditor MCP into their development workflow. Every time a developer commits a contract change, their AI agent calls `audit_soroban_contract`, pays 0.15 USDC autonomously, and posts findings as a PR comment — in 20 seconds.
-
-**Result:**
-- Cost per audit: **$0.15** vs $20,000–$80,000 → **99.99% cost reduction**
-- Time per audit: **~20 seconds** vs 4–8 weeks → **100,000× faster**
-- Coverage: **every commit** instead of once at launch → vulnerabilities caught while code is being written, not after funds are drained
-- Proven: our test vault contract's 3 vulnerabilities (missing `require_auth`, unchecked arithmetic, unbounded storage) were all detected correctly in a single 20-second run
-
----
-
-### Scenario 2 — Autonomous Agent Swarm
-
-**Real World Scenario:** A Web3 security DAO deploys a fleet of AI agents that continuously audit competitor and partner protocols for responsible disclosure. They need to audit 200+ contracts per day, 24/7. Paying for each audit manually is impossible — no human can approve 200 microtransactions a day.
-
-**Action:** Each agent calls `audit_soroban_contract_mpp`, pays 0.15 USDC from a shared agent wallet, and files findings to a database. Zero human involvement in the payment loop.
-
-**Result:**
-- 200 audits/day × $0.15 = **$30/day** in fully autonomous on-chain spending — every payment traceable, tamper-proof, no chargebacks
-- Zero human approvals — machine-to-machine payments at machine speed
-- Soroban smart wallet policies cap the agent wallet at a daily budget → **machine-enforced spending limits**, not just soft limits in config
-- Every payment is a real Stellar ledger entry: auditable, immutable, exportable for accounting
-
----
-
-### Scenario 3 — Developer Tool Marketplace
-
-**Real World Scenario:** A developer tools marketplace wants to offer pay-per-use AI tools without user accounts, billing forms, or monthly subscriptions. Traditional monetization requires a Stripe integration, user signup, and credit-based systems — all requiring human interaction to set up.
-
-**Action:** Tools expose x402 endpoints. AI agents (Claude Code, Cursor, Copilot) browse and pay directly — the auditor is listed at 0.15 USDC/call. Agents discover the endpoint, pay, and consume in one automated flow.
-
-**Result:**
-- Setup time to monetize a new tool: **one middleware line** in Express → revenue flows immediately
-- Setup time for buyers: **zero** — agents pay with a Stellar keypair they already have; no account required
-- Payment finality: **3–5 seconds** (Stellar consensus) vs 3–5 business days (bank transfer)
-- This revenue model — per-call micropayments at $0.15/call — was previously economically impossible (Stripe fees alone exceed $0.15). Stellar's ~$0.00001/tx fee makes it viable.
-
----
-
-### Scenario 4 — Security Coverage for Hackathon Ecosystems
-
-**Real World Scenario:** Every Stellar hackathon sees 100+ teams shipping contracts under time pressure. Most skip security review. The Stellar Development Foundation wants to incentivize secure development but can't manually review 100 contracts — there aren't enough auditors.
-
-**Action:** SDF integrates the auditor MCP into the hackathon starter kit. Before submission, Claude Code automatically audits each team's contract, pays 0.15 USDC, and includes the findings report.
-
-**Result:**
-- 100 teams × 5 audits each = **500 autonomous Stellar micropayments** over 2 weeks
-- Total cost to SDF: **$75 in USDC** to sponsor the wallet — vs $0 budget for manual security review of 100 submissions
-- Security coverage: **100% of submissions** → vs ~5% that could afford professional review
-- Real Stellar testnet transactions prove the payment protocol operates at hackathon scale
+| User Persona | Real-World Scenario | Quantifiable Impact |
+|---|---|---|
+| DeFi developer | Needs a security audit before launching a Soroban lending protocol. Traditional firms charge $20k–$80k and take 4–8 weeks. | **$0.15/audit** vs $20k+ — 99.99% cost reduction. **~20 seconds** vs 4–8 weeks — 100,000× faster. Run on every commit, not just at launch. |
+| Autonomous agent fleet | A security DAO runs 200+ contract audits per day with no human in the loop. Manual payment approval is impossible at that scale. | **$30/day** in fully autonomous on-chain spending. Zero human approvals. Every payment is a traceable, immutable Stellar ledger entry. |
+| Dev tool builder | Wants per-call monetization without user accounts, billing setup, or subscriptions. Stripe fees alone exceed $0.15/call. | Stellar's ~$0.00001/tx fee makes $0.15 micropayments viable. **One middleware line** to monetize. Buyers need only a Stellar keypair — no signup. |
+| Hackathon organizer | 100+ teams ship contracts under time pressure; most skip security review. Not enough auditors to cover all submissions manually. | **100% audit coverage** for $75 in USDC — vs $0 budget for manual review of 100 submissions. Real on-chain transactions prove the protocol at scale. |
 
 ---
 
