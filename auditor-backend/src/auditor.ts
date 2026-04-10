@@ -186,6 +186,7 @@ export async function auditContract(code: string): Promise<AuditReport> {
   const userAuditRequest = `Audit the following Soroban smart contract:\n\n\`\`\`rust\n${code}\n\`\`\``;
 
   // ── Pass 1: Chain-of-thought reasoning ──────────────────────────────────
+  console.log(`  [AI] Pass 1: deep reasoning over all functions...`);
   const pass1 = await client.chat.completions.create({
     model: MODEL,
     messages: [
@@ -203,6 +204,7 @@ export async function auditContract(code: string): Promise<AuditReport> {
   }
 
   // ── Pass 2: Convert reasoning → structured JSON ──────────────────────────
+  console.log(`  [AI] Pass 2: extracting structured findings...`);
   const pass2 = await client.chat.completions.create({
     model: MODEL,
     messages: [

@@ -108,21 +108,58 @@ app.post("/api/audit/demo", async (req, res) => {
 });
 
 // Stellar MPP endpoint — payment gated by @stellar/mpp + mppx
-app.post("/api/audit/mpp", mppAuditPaywall, async (req, res) => {
-  const { code } = req.body as { code?: string };
-  if (!code || typeof code !== "string" || code.trim().length === 0) {
-    res.status(400).json({ error: "Request body must include a non-empty 'code' field." });
-    return;
-  }
-  try {
-    const report = await auditContract(code);
-    res.json(report);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("MPP audit error:", message);
-    res.status(502).json({ error: "Audit failed", detail: message });
-  }
-});
+app.post(
+  "/api/audit/mpp",
+  (req, res, next) => {
+    const bytes = Buffer.byteLength(JSON.stringify(req.body), "utf8");
+    console.log(`\n→ [MPP] Incoming audit request (${bytes.toLocaleString()} bytes of Rust)`);
+
+    // Intercept the response to log the 402 challenge when it happens
+    const origEnd = res.end.bind(res);
+    (res as any).end = function (...args: any[]) {
+      if (res.statusCode === 402) {
+        console.log(`← [MPP] HTTP 402 — payment challenge issued (0.15 USDC, stellar:testnet)`);
+        console.log(`   Waiting for client to pay and retry...`);
+      }
+      return origEnd(...args);
+    };
+
+    next();
+  },
+  mppAuditPaywall,
+  async (req, res) => {
+    const { code } = req.body as { code?: string };
+    if (!code || typeof code !== "string" || code.trim().length === 0) {
+      res.status(400).json({ error: "Request body must include a non-empty 'code' field." });
+      return;
+    }
+
+    console.log(`✓ [MPP] Payment verified — starting security audit...`);
+    const start = Date.now();
+
+    try {
+      const report = await auditContract(code);
+      const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+
+      const counts: Record<string, number> = {};
+      for (const f of report.findings) counts[f.severity] = (counts[f.severity] ?? 0) + 1;
+      const summary = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+        .filter((s) => counts[s])
+        .map((s) => `${counts[s]} ${s}`)
+        .join(", ");
+
+      console.log(
+        `✓ [AUDIT] Complete — ${report.findings.length} finding(s)${summary ? `: ${summary}` : " (clean)"} (${elapsed}s)\n`,
+      );
+
+      res.json(report);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`✗ [AUDIT] Failed: ${message}\n`);
+      res.status(502).json({ error: "Audit failed", detail: message });
+    }
+  },
+);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
