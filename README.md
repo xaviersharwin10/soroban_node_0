@@ -14,7 +14,7 @@ An AI agent (Claude Code, or any MCP-compatible agent) reads your Soroban `.rs` 
 
 ## Architecture
 
-![Architecture Diagram](docs/architecture.png)
+![Architecture Diagram](docs/architecture.svg)
 
 ---
 
@@ -22,11 +22,11 @@ An AI agent (Claude Code, or any MCP-compatible agent) reads your Soroban `.rs` 
 
 ### x402 Payment Flow
 
-![x402 Sequence Diagram](docs/sequence_x402.png)
+![x402 Sequence Diagram](docs/sequence_x402.svg)
 
 ### Stripe MPP Flow
 
-![Stripe MPP Sequence Diagram](docs/sequence_mpp.png)
+![Stripe MPP Sequence Diagram](docs/sequence_mpp.svg)
 
 ---
 
