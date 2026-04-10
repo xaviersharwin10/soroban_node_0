@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    participant A as 🤖 AI Agent<br/>(Claude Code)
+    participant M as MCP Server<br/>(auditor-mcp)
+    participant B as Auditor Backend<br/>(Express.js)
+    participant F as OpenZeppelin<br/>x402 Facilitator
+    participant S as Stellar Testnet<br/>(USDC SAC)
+    participant G as Groq<br/>(AI Engine)
+
+    A->>M: audit_soroban_contract(file_path)
+    M->>M: readFile(file_path)
+
+    M->>B: POST /api/audit<br/>{ code: "..." }
+    B-->>M: HTTP 402<br/>WWW-Authenticate: x402<br/>scheme=exact · price=0.15 USDC<br/>payTo=GDJUT... · network=stellar:testnet
+
+    Note over M,S: Agent pays autonomously — no human approval
+
+    M->>S: Submit Stellar auth entry<br/>0.15 USDC · Ed25519 signed
+    S-->>F: Transaction confirmed on-chain
+    F-->>B: Payment verified ✓
+
+    M->>B: POST /api/audit<br/>X-PAYMENT: <receipt>
+
+    B->>G: Pass 1 — chain-of-thought reasoning<br/>(auth, arithmetic, storage, events)
+    G-->>B: Reasoning trace
+
+    B->>G: Pass 2 — structured JSON extraction
+    G-->>B: findings[] with CWE IDs + severity
+
+    B-->>M: HTTP 200<br/>{ findings: [...], model: "...", summary: "..." }
+    M-->>A: Structured audit report

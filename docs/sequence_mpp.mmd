@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    participant A as 🤖 AI Agent<br/>(Claude Code)
+    participant M as MCP Server<br/>(auditor-mcp)
+    participant B as Auditor Backend<br/>(Express.js)
+    participant S as Stellar Testnet<br/>(USDC SAC)
+    participant G as Groq<br/>(AI Engine)
+
+    A->>M: audit_soroban_contract_mpp(file_path)
+    M->>M: readFile(file_path)
+
+    M->>B: mppClient.fetch()<br/>POST /api/audit/mpp<br/>{ code: "..." }
+    B-->>M: HTTP 402<br/>MPP challenge<br/>HMAC-signed ID · 0.15 USDC<br/>USDC SAC · stellar:testnet
+
+    Note over M,S: Agent pays autonomously — no human approval
+
+    M->>S: SAC transfer 0.15 USDC<br/>stellar.charge() · Stellar keypair
+    S-->>M: Transaction hash + receipt
+
+    M->>B: POST /api/audit/mpp (retry)<br/>X-MPP-Credential: <payment proof>
+    B->>S: mppx verifies SAC receipt on-chain
+    S-->>B: Verified ✓
+
+    B->>G: Pass 1 — chain-of-thought reasoning<br/>(auth, arithmetic, storage, events)
+    G-->>B: Reasoning trace
+
+    B->>G: Pass 2 — structured JSON extraction
+    G-->>B: findings[] with CWE IDs + severity
+
+    B-->>M: HTTP 200<br/>{ findings: [...], model: "...", summary: "..." }
+    M-->>A: Structured audit report

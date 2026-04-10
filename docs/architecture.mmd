@@ -1,0 +1,60 @@
+flowchart TD
+    A["🤖 AI Agent\n(Claude Code / any MCP agent)"]
+
+    subgraph MCP ["MCP Server  (auditor-mcp)"]
+        T1["tool: audit_soroban_contract\n─────────────────────\nx402 protocol\nStellar Ed25519 signer"]
+        T2["tool: audit_soroban_contract_mpp\n─────────────────────\nStripe MPP protocol\nStellar SAC transfer"]
+    end
+
+    subgraph STELLAR ["Stellar Testnet"]
+        S1["USDC SAC\nx402 settlement"]
+        S2["USDC SAC\nMPP settlement"]
+        F["OpenZeppelin\nx402 Facilitator\n(verifies & settles)"]
+    end
+
+    subgraph BACKEND ["Auditor Backend  (Express.js · port 3001)"]
+        R1["POST /api/audit\nx402 paywall"]
+        R2["POST /api/audit/mpp\nMPP paywall"]
+    end
+
+    subgraph AI ["AI Audit Engine  (Groq)"]
+        P1["Pass 1\nChain-of-thought\nreasoning"]
+        P2["Pass 2\nStructured JSON\nfindings"]
+    end
+
+    OUT["📋 Audit Report\nCWE IDs · Severity · Confidence\nAffected function · Exact fix"]
+
+    A -->|"MCP tool call"| T1
+    A -->|"MCP tool call"| T2
+
+    T1 -->|"POST + X-PAYMENT header"| R1
+    T2 -->|"POST + MPP credential"| R2
+
+    T1 -->|"0.15 USDC"| S1
+    S1 -->|"verified"| F
+    F -->|"receipt"| R1
+
+    T2 -->|"0.15 USDC SAC"| S2
+    S2 -->|"receipt"| R2
+
+    R1 --> P1
+    R2 --> P1
+    P1 --> P2
+    P2 --> OUT
+    OUT -->|"structured report"| A
+
+    style A fill:#7c3aed,color:#fff,stroke:#5b21b6
+    style MCP fill:#1e3a5f,color:#fff,stroke:#2563eb
+    style STELLAR fill:#0f4c35,color:#fff,stroke:#059669
+    style BACKEND fill:#1e293b,color:#fff,stroke:#475569
+    style AI fill:#3b1f00,color:#fff,stroke:#d97706
+    style OUT fill:#1a1a2e,color:#fff,stroke:#6366f1
+    style T1 fill:#1d4ed8,color:#fff,stroke:#1d4ed8
+    style T2 fill:#1d4ed8,color:#fff,stroke:#1d4ed8
+    style R1 fill:#374151,color:#fff,stroke:#374151
+    style R2 fill:#374151,color:#fff,stroke:#374151
+    style P1 fill:#92400e,color:#fff,stroke:#92400e
+    style P2 fill:#92400e,color:#fff,stroke:#92400e
+    style S1 fill:#065f46,color:#fff,stroke:#065f46
+    style S2 fill:#065f46,color:#fff,stroke:#065f46
+    style F fill:#065f46,color:#fff,stroke:#065f46

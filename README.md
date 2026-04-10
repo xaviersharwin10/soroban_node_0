@@ -14,70 +14,7 @@ An AI agent (Claude Code, or any MCP-compatible agent) reads your Soroban `.rs` 
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                        AI AGENT  (Claude Code)                       │
-│                                                                      │
-│   "Audit this Soroban contract for vulnerabilities"                  │
-│   → calls MCP tool: audit_soroban_contract_mpp                       │
-└────────────────────────┬─────────────────────────────────────────────┘
-                         │ MCP stdio (tool call)
-                         ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                      MCP SERVER  (auditor-mcp)                       │
-│                                                                      │
-│  Tools exposed to agents:                                            │
-│  • audit_soroban_contract      — pays via x402 protocol              │
-│  • audit_soroban_contract_mpp  — pays via Stripe MPP protocol        │
-│                                                                      │
-│  Payment clients:                                                    │
-│  • x402Client + ExactStellarScheme  (Stellar Ed25519 signer)         │
-│  • MppxClient + stellar.charge()    (Stellar SAC transfer)           │
-│                                                                      │
-│  Wallet: agent's Stellar keypair, pre-funded with USDC (testnet)     │
-└────────────┬───────────────────────────────────────┬────────────────┘
-             │ HTTP POST                              │ HTTP POST
-             │ x402 flow ──────────────────┐          │ MPP flow ───────────────┐
-             ▼                             ▼          ▼                         ▼
-┌────────────────────────┐   ┌────────────────────────────┐   ┌────────────────────────────┐
-│  PAYMENT FACILITATOR   │   │     STELLAR TESTNET        │   │     STELLAR TESTNET        │
-│  (OpenZeppelin x402)   │   │     (USDC SAC Transfer)    │   │     (USDC SAC Transfer)    │
-│                        │   │                            │   │                            │
-│  Verifies Stellar      │   │  mppx challenge issued     │   │  SAC transfer submitted    │
-│  auth entry on-chain   │   │  client signs + pays       │   │  mppx verifies receipt     │
-│  Settles to server     │   │  Settles to server wallet  │   │  Settles to server wallet  │
-└────────────┬───────────┘   └──────────────┬────────────┘   └──────────────┬─────────────┘
-             │ verified                      │ verified                      │ verified
-             └──────────────────┬────────────┘                              │
-                                │                                           │
-                                ▼                                           ▼
-┌──────────────────────────────────────────────────────────────────────────────────────────┐
-│                    AUDITOR BACKEND  (Express.js — port 3001)                             │
-│                                                                                          │
-│  POST /api/audit      — x402 paywall via paymentMiddleware + ExactStellarScheme          │
-│  POST /api/audit/mpp  — MPP paywall  via mppAuditPaywall  (mppx + @stellar/mpp)         │
-│                                                                                          │
-│  Price: 0.15 USDC · Network: stellar:testnet · Facilitator: OpenZeppelin Built-on-Stellar│
-└────────────────────────┬─────────────────────────────────────────────────────────────────┘
-                         │
-                         ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                      AI AUDIT ENGINE  (Groq)                         │
-│                                                                      │
-│  Model: llama-3.3-70b-versatile                                      │
-│                                                                      │
-│  Pass 1 — Chain-of-thought reasoning                                 │
-│    Traces every function: authorization, arithmetic, storage,        │
-│    error handling, cross-contract calls, events                      │
-│                                                                      │
-│  Pass 2 — Structured JSON extraction                                 │
-│    Converts reasoning → findings with CWE IDs,                       │
-│    severity, confidence score, affected function, exact fix          │
-│                                                                      │
-│  Taxonomy: Sanctifier S001–S012, OpenZeppelin Stellar Contracts,     │
-│            CoinFabrik Scout, CVE GHSA-PM4J-7R4Q-CCG8                │
-└──────────────────────────────────────────────────────────────────────┘
-```
+![Architecture Diagram](docs/architecture.png)
 
 ---
 
@@ -85,82 +22,11 @@ An AI agent (Claude Code, or any MCP-compatible agent) reads your Soroban `.rs` 
 
 ### x402 Payment Flow
 
-```
-Agent (Claude Code)        MCP Server              Auditor Backend       Stellar Testnet
-        │                      │                         │                      │
-        │  audit_soroban_      │                         │                      │
-        │  contract(file_path) │                         │                      │
-        │─────────────────────>│                         │                      │
-        │                      │─── readFile(path) ──>   │                      │
-        │                      │                         │                      │
-        │                      │  POST /api/audit        │                      │
-        │                      │  { code: "..." }        │                      │
-        │                      │────────────────────────>│                      │
-        │                      │                         │                      │
-        │                      │     HTTP 402            │                      │
-        │                      │     WWW-Authenticate:   │                      │
-        │                      │     scheme=exact        │                      │
-        │                      │     price=0.15 USDC     │                      │
-        │                      │     payTo=GDJUT...      │                      │
-        │                      │<────────────────────────│                      │
-        │                      │                         │                      │
-        │                      │  Signs Stellar auth     │                      │
-        │                      │  entry (Ed25519 key)    │                      │
-        │                      │  0.15 USDC transfer ────────────────────────> │
-        │                      │                         │                      │
-        │                      │  OpenZeppelin facilitator verifies on-chain    │
-        │                      │  ──────────────────────────────────────────── │
-        │                      │                         │                      │
-        │                      │  POST /api/audit        │                      │
-        │                      │  X-PAYMENT: <receipt>   │                      │
-        │                      │────────────────────────>│                      │
-        │                      │                         │  AI audit (2-pass)   │
-        │                      │                         │  ~15–20s             │
-        │                      │     HTTP 200            │                      │
-        │                      │     { findings: [...] } │                      │
-        │                      │<────────────────────────│                      │
-        │  Structured report   │                         │                      │
-        │<─────────────────────│                         │                      │
-```
+![x402 Sequence Diagram](docs/sequence_x402.png)
 
 ### Stripe MPP Flow
 
-```
-Agent (Claude Code)        MCP Server              Auditor Backend       Stellar Testnet
-        │                      │                         │                      │
-        │  audit_soroban_      │                         │                      │
-        │  contract_mpp(path)  │                         │                      │
-        │─────────────────────>│                         │                      │
-        │                      │─── readFile(path) ──>   │                      │
-        │                      │                         │                      │
-        │                      │  mppClient.fetch()      │                      │
-        │                      │  POST /api/audit/mpp    │                      │
-        │                      │────────────────────────>│                      │
-        │                      │                         │                      │
-        │                      │     HTTP 402            │                      │
-        │                      │     MPP challenge       │                      │
-        │                      │     (HMAC-signed ID,    │                      │
-        │                      │      0.15 USDC, SAC     │                      │
-        │                      │      stellar:testnet)   │                      │
-        │                      │<────────────────────────│                      │
-        │                      │                         │                      │
-        │                      │  stellar.charge()       │                      │
-        │                      │  SAC transfer 0.15 USDC ────────────────────> │
-        │                      │                         │                      │
-        │                      │  Credential header built from Stellar receipt  │
-        │                      │  POST /api/audit/mpp                           │
-        │                      │  X-MPP-Credential: ...  │                      │
-        │                      │────────────────────────>│                      │
-        │                      │                         │  mppx verifies       │
-        │                      │                         │  SAC receipt ──────> │
-        │                      │                         │                      │
-        │                      │                         │  AI audit (2-pass)   │
-        │                      │     HTTP 200            │  ~15–20s             │
-        │                      │     { findings: [...] } │                      │
-        │                      │<────────────────────────│                      │
-        │  Structured report   │                         │                      │
-        │<─────────────────────│                         │                      │
-```
+![Stripe MPP Sequence Diagram](docs/sequence_mpp.png)
 
 ---
 
