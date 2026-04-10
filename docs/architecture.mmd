@@ -1,9 +1,10 @@
+%%{init: {'theme': 'default', 'themeVariables': {'fontSize': '18px', 'fontFamily': 'trebuchet ms, verdana, arial'}}}%%
 flowchart TD
     A["🤖 AI Agent\n(Claude Code / any MCP agent)"]
 
     subgraph MCP ["MCP Server  (auditor-mcp)"]
-        T1["tool: audit_soroban_contract\n─────────────────────\nx402 protocol\nStellar Ed25519 signer"]
-        T2["tool: audit_soroban_contract_mpp\n─────────────────────\nStripe MPP protocol\nStellar SAC transfer"]
+        T1["tool: audit_soroban_contract\n─────────────────────\nx402 protocol · Stellar Ed25519 signer"]
+        T2["tool: audit_soroban_contract_mpp\n─────────────────────\nStripe MPP protocol · Stellar SAC transfer"]
     end
 
     subgraph STELLAR ["Stellar Testnet"]
@@ -17,12 +18,12 @@ flowchart TD
         R2["POST /api/audit/mpp\nMPP paywall"]
     end
 
-    subgraph AI ["AI Audit Engine  (Groq)"]
-        P1["Pass 1\nChain-of-thought\nreasoning"]
-        P2["Pass 2\nStructured JSON\nfindings"]
+    subgraph AI ["AI Audit Engine  (Groq · llama-3.3-70b-versatile)"]
+        P1["Pass 1\nChain-of-thought reasoning\n(auth · arithmetic · storage · events)"]
+        P2["Pass 2\nStructured JSON findings\n(CWE IDs · severity · confidence · fix)"]
     end
 
-    OUT["📋 Audit Report\nCWE IDs · Severity · Confidence\nAffected function · Exact fix"]
+    OUT["📋 Audit Report\nCWE IDs · Severity · Confidence · Exact fix"]
 
     A -->|"MCP tool call"| T1
     A -->|"MCP tool call"| T2
@@ -43,18 +44,14 @@ flowchart TD
     P2 --> OUT
     OUT -->|"structured report"| A
 
-    style A fill:#7c3aed,color:#fff,stroke:#5b21b6
-    style MCP fill:#1e3a5f,color:#fff,stroke:#2563eb
-    style STELLAR fill:#0f4c35,color:#fff,stroke:#059669
-    style BACKEND fill:#1e293b,color:#fff,stroke:#475569
-    style AI fill:#3b1f00,color:#fff,stroke:#d97706
-    style OUT fill:#1a1a2e,color:#fff,stroke:#6366f1
-    style T1 fill:#1d4ed8,color:#fff,stroke:#1d4ed8
-    style T2 fill:#1d4ed8,color:#fff,stroke:#1d4ed8
-    style R1 fill:#374151,color:#fff,stroke:#374151
-    style R2 fill:#374151,color:#fff,stroke:#374151
-    style P1 fill:#92400e,color:#fff,stroke:#92400e
-    style P2 fill:#92400e,color:#fff,stroke:#92400e
-    style S1 fill:#065f46,color:#fff,stroke:#065f46
-    style S2 fill:#065f46,color:#fff,stroke:#065f46
-    style F fill:#065f46,color:#fff,stroke:#065f46
+    style A fill:#ede9fe,color:#3b0764,stroke:#7c3aed,stroke-width:2px
+    style T1 fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:1px
+    style T2 fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:1px
+    style S1 fill:#d1fae5,color:#064e3b,stroke:#10b981,stroke-width:1px
+    style S2 fill:#d1fae5,color:#064e3b,stroke:#10b981,stroke-width:1px
+    style F fill:#d1fae5,color:#064e3b,stroke:#10b981,stroke-width:1px
+    style R1 fill:#f1f5f9,color:#1e293b,stroke:#64748b,stroke-width:1px
+    style R2 fill:#f1f5f9,color:#1e293b,stroke:#64748b,stroke-width:1px
+    style P1 fill:#fef3c7,color:#451a03,stroke:#f59e0b,stroke-width:1px
+    style P2 fill:#fef3c7,color:#451a03,stroke:#f59e0b,stroke-width:1px
+    style OUT fill:#ede9fe,color:#3b0764,stroke:#7c3aed,stroke-width:2px

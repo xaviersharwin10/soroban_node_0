@@ -1,3 +1,4 @@
+%%{init: {'theme': 'default', 'themeVariables': {'fontSize': '20px', 'fontFamily': 'trebuchet ms, verdana, arial', 'actorBkg': '#1d4ed8', 'actorTextColor': '#ffffff', 'actorBorderColor': '#1e40af', 'activationBkgColor': '#dbeafe', 'noteBkgColor': '#fef9c3', 'noteTextColor': '#1a1a1a', 'labelBoxBkgColor': '#f0f4ff', 'sequenceNumberColor': '#ffffff'}}}%%
 sequenceDiagram
     autonumber
     participant A as 🤖 AI Agent<br/>(Claude Code)
@@ -19,7 +20,7 @@ sequenceDiagram
     S-->>F: Transaction confirmed on-chain
     F-->>B: Payment verified ✓
 
-    M->>B: POST /api/audit<br/>X-PAYMENT: <receipt>
+    M->>B: POST /api/audit<br/>X-PAYMENT: receipt
 
     B->>G: Pass 1 — chain-of-thought reasoning<br/>(auth, arithmetic, storage, events)
     G-->>B: Reasoning trace
@@ -27,5 +28,5 @@ sequenceDiagram
     B->>G: Pass 2 — structured JSON extraction
     G-->>B: findings[] with CWE IDs + severity
 
-    B-->>M: HTTP 200<br/>{ findings: [...], model: "...", summary: "..." }
+    B-->>M: HTTP 200<br/>{ findings: [...], model, summary }
     M-->>A: Structured audit report
