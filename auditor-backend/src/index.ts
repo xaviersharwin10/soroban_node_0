@@ -4,9 +4,57 @@ import cors from "cors";
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { ExactStellarScheme } from "@x402/stellar/exact/server";
 import { HTTPFacilitatorClient } from "@x402/core/server";
+import { Transaction, Networks } from "@stellar/stellar-sdk";
 import { auditContract } from "./auditor.js";
 import { demoAudit, type PaymentAsset } from "./demo.js";
 import { mppAuditPaywall } from "./mpp.js";
+
+// ---------------------------------------------------------------------------
+// Extract Stellar transaction hash from x402 or MPP payment headers
+// ---------------------------------------------------------------------------
+
+function extractStellarTxUrl(req: express.Request, protocol: "x402" | "mpp"): string | null {
+  try {
+    if (protocol === "x402") {
+      // X-PAYMENT header contains the payment proof (base64-encoded JSON or raw JSON)
+      const raw = req.headers["x-payment"] as string | undefined;
+      if (!raw) return null;
+      let parsed: any;
+      try { parsed = JSON.parse(raw); } catch {
+        try { parsed = JSON.parse(Buffer.from(raw, "base64").toString("utf8")); } catch { return null; }
+      }
+      const xdr = parsed?.payload?.transaction;
+      if (!xdr) return null;
+      const tx = new Transaction(xdr, Networks.TESTNET);
+      const hash = tx.hash().toString("hex");
+      return `https://stellar.expert/explorer/testnet/tx/${hash}`;
+    }
+
+    if (protocol === "mpp") {
+      // Authorization header: "mpp <base64-encoded credential JSON>"
+      const auth = req.headers["authorization"] as string | undefined;
+      if (!auth) return null;
+      const token = auth.replace(/^mpp\s+/i, "").replace(/^Bearer\s+/i, "").trim();
+      let parsed: any;
+      try { parsed = JSON.parse(token); } catch {
+        try { parsed = JSON.parse(Buffer.from(token, "base64").toString("utf8")); } catch { return null; }
+      }
+      // Push-mode: payload.hash IS the Stellar tx hash
+      const hash = parsed?.payload?.hash ?? parsed?.hash;
+      if (hash) return `https://stellar.expert/explorer/testnet/tx/${hash}`;
+      // Pull-mode: payload.transaction is XDR
+      const xdr = parsed?.payload?.transaction ?? parsed?.transaction;
+      if (xdr) {
+        const tx = new Transaction(xdr, Networks.TESTNET);
+        return `https://stellar.expert/explorer/testnet/tx/${tx.hash().toString("hex")}`;
+      }
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 const PORT = process.env.PORT ?? "3001";
 const STELLAR_ADDRESS = process.env.TESTNET_SERVER_STELLAR_ADDRESS ?? "";
@@ -78,7 +126,9 @@ app.post("/api/audit", async (req, res) => {
   // Payment has been verified by x402 middleware at this point.
   try {
     const report = await auditContract(code);
-    res.json(report);
+    const txUrl = extractStellarTxUrl(req, "x402");
+    if (txUrl) console.log(`  [x402] Stellar tx: ${txUrl}`);
+    res.json({ ...report, stellarTxUrl: txUrl });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Audit error:", message);
@@ -148,11 +198,13 @@ app.post(
         .map((s) => `${counts[s]} ${s}`)
         .join(", ");
 
+      const txUrl = extractStellarTxUrl(req, "mpp");
+      if (txUrl) console.log(`  [MPP] Stellar tx: ${txUrl}`);
       console.log(
         `✓ [AUDIT] Complete — ${report.findings.length} finding(s)${summary ? `: ${summary}` : " (clean)"} (${elapsed}s)\n`,
       );
 
-      res.json(report);
+      res.json({ ...report, stellarTxUrl: txUrl });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`✗ [AUDIT] Failed: ${message}\n`);

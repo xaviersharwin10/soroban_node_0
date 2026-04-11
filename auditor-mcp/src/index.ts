@@ -171,7 +171,9 @@ server.tool(
           text: JSON.stringify(
             {
               file: file_path,
+              protocol: "x402 / Stellar Testnet",
               walletAddress: signer.address,
+              stellarTxUrl: (report as any)?.stellarTxUrl ?? null,
               model: report?.model,
               summary: summary || "No vulnerabilities found",
               findings,
