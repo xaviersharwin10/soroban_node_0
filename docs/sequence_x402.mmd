@@ -6,6 +6,7 @@ sequenceDiagram
     participant B as Auditor Backend<br/>(Express.js)
     participant F as OpenZeppelin<br/>x402 Facilitator
     participant S as Stellar Testnet<br/>(USDC SAC)
+    participant R as RAG Engine<br/>(local embeddings)
     participant G as Groq<br/>(AI Engine)
 
     A->>M: audit_soroban_contract(file_path)
@@ -22,11 +23,14 @@ sequenceDiagram
 
     M->>B: POST /api/audit<br/>X-PAYMENT: receipt
 
-    B->>G: Pass 1 — chain-of-thought reasoning<br/>(auth, arithmetic, storage, events)
+    B->>R: embed contract code<br/>cosine similarity search
+    R-->>B: top-4 relevant security doc chunks<br/>(Sanctifier · OpenZeppelin · CWE)
+
+    B->>G: Pass 1 — chain-of-thought reasoning<br/>(auth, arithmetic, storage, events)<br/>+ RAG context injected
     G-->>B: Reasoning trace
 
     B->>G: Pass 2 — structured JSON extraction
     G-->>B: findings[] with CWE IDs + severity
 
-    B-->>M: HTTP 200<br/>{ findings: [...], model, summary }
+    B-->>M: HTTP 200<br/>{ findings: [...], model, summary, reasoning }
     M-->>A: Structured audit report

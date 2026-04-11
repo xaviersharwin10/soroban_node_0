@@ -18,6 +18,12 @@ flowchart TD
         R2["POST /api/audit/mpp\nMPP paywall"]
     end
 
+    subgraph RAG ["RAG Retrieval  (local · no API key)"]
+        V["all-MiniLM-L6-v2\nlocal ONNX embeddings"]
+        D["7 curated Soroban security docs\nSanctifier S001–S012 · OpenZeppelin · CWE"]
+        V --- D
+    end
+
     subgraph AI ["AI Audit Engine  (Groq · llama-3.3-70b-versatile)"]
         P1["Pass 1\nChain-of-thought reasoning\n(auth · arithmetic · storage · events)"]
         P2["Pass 2\nStructured JSON findings\n(CWE IDs · severity · confidence · fix)"]
@@ -38,8 +44,9 @@ flowchart TD
     T2 -->|"0.15 USDC SAC"| S2
     S2 -->|"receipt"| R2
 
-    R1 --> P1
-    R2 --> P1
+    R1 -->|"contract code"| V
+    R2 -->|"contract code"| V
+    V -->|"top-4 relevant chunks"| P1
     P1 --> P2
     P2 --> OUT
     OUT -->|"structured report"| A
@@ -52,6 +59,8 @@ flowchart TD
     style F fill:#d1fae5,color:#064e3b,stroke:#10b981,stroke-width:1px
     style R1 fill:#f1f5f9,color:#1e293b,stroke:#64748b,stroke-width:1px
     style R2 fill:#f1f5f9,color:#1e293b,stroke:#64748b,stroke-width:1px
+    style V fill:#fef3c7,color:#451a03,stroke:#d97706,stroke-width:1px
+    style D fill:#fef3c7,color:#451a03,stroke:#d97706,stroke-width:1px
     style P1 fill:#fef3c7,color:#451a03,stroke:#f59e0b,stroke-width:1px
     style P2 fill:#fef3c7,color:#451a03,stroke:#f59e0b,stroke-width:1px
     style OUT fill:#ede9fe,color:#3b0764,stroke:#7c3aed,stroke-width:2px

@@ -10,6 +10,8 @@ Built for **[Stellar Hacks: Agents](https://dorahacks.io/hackathon/stellar-agent
 
 An AI agent (Claude Code, or any MCP-compatible agent) reads your Soroban `.rs` contract, pays **0.15 USDC on Stellar Testnet** in a single autonomous transaction, and returns a structured security report with CWE IDs, severity levels, and exact code fixes — all without a human touching a wallet.
 
+The backend grounds every audit in curated Soroban security knowledge via a **local RAG pipeline** (all-MiniLM-L6-v2, runs in Node.js, no API key) — retrieving the most relevant chunks from 7 security docs (Sanctifier S001–S012, OpenZeppelin Stellar Contracts audits, CVE advisories) before each AI pass.
+
 ---
 
 ## Architecture
@@ -104,6 +106,8 @@ The `reasoning` field contains the full chain-of-thought analysis from the AI's 
 | Payment asset | USDC (Stellar SAC) |
 | Payment facilitator | OpenZeppelin Built-on-Stellar x402 |
 | Gateway server | Express.js (TypeScript) |
+| RAG embedding model | `all-MiniLM-L6-v2` via `@xenova/transformers` (local ONNX, no API key) |
+| RAG knowledge base | 7 curated Soroban security docs — Sanctifier S001–S012, OpenZeppelin Stellar Contracts, CVE advisories |
 | AI model | Groq `llama-3.3-70b-versatile` |
 | Audit price | 0.15 USDC per contract |
 | Audit standard | Sanctifier S001–S012, OpenZeppelin Stellar Contracts |
@@ -171,9 +175,12 @@ stellar/
 ├── auditor-backend/          # Express.js gateway + AI engine
 │   ├── src/
 │   │   ├── index.ts          # Routes: /api/audit (x402), /api/audit/mpp (MPP)
-│   │   ├── auditor.ts        # Two-pass AI audit engine (Groq)
+│   │   ├── auditor.ts        # Two-pass AI audit engine (Groq) + RAG injection
 │   │   ├── mpp.ts            # Stellar MPP paywall middleware (mppx)
-│   │   └── demo.ts           # Web UI demo endpoint (server-side payment)
+│   │   ├── demo.ts           # Web UI demo endpoint (server-side payment)
+│   │   └── rag/
+│   │       ├── rag.ts        # buildIndex() + retrieve() — local cosine similarity
+│   │       └── docs.ts       # 7 curated Soroban security docs (hardcoded)
 │   └── .env.example
 │
 ├── auditor-mcp/              # MCP server (stdio transport)
