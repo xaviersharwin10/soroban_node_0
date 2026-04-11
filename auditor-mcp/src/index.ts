@@ -259,6 +259,21 @@ server.tool(
       };
     }
 
+    // Extract real on-chain tx hash from Payment-Receipt header (set by mppx middleware
+    // after the Stellar transaction is submitted during settlement).
+    // Receipt schema: { method, reference: "<txHash>", status, timestamp }
+    let mppStellarTxUrl: string | null = null;
+    try {
+      const receiptHeader = response.headers.get("Payment-Receipt");
+      if (receiptHeader) {
+        const json = Buffer.from(receiptHeader, "base64url").toString("utf8");
+        const receipt = JSON.parse(json);
+        if (receipt?.reference) {
+          mppStellarTxUrl = `https://stellar.expert/explorer/testnet/tx/${receipt.reference}`;
+        }
+      }
+    } catch { /* ignore — mppStellarTxUrl stays null */ }
+
     const rawBody = await response.text();
 
     if (!response.ok) {
@@ -305,7 +320,7 @@ server.tool(
               file: file_path,
               protocol: "Stripe MPP / Stellar Testnet",
               walletAddress: signer.address,
-              stellarTxUrl: (report as any)?.stellarTxUrl ?? null,
+              stellarTxUrl: mppStellarTxUrl,
               model: report?.model,
               summary: summary || "No vulnerabilities found",
               findings,
