@@ -19,7 +19,7 @@ import { createEd25519Signer } from "./stellar/signer";
 // ---------------------------------------------------------------------------
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
-loadEnv({ path: resolve(currentDir, "..", ".env") });
+loadEnv({ path: resolve(currentDir, "..", ".env"), quiet: true });
 
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
