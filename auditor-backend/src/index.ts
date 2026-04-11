@@ -6,6 +6,7 @@ import { ExactStellarScheme } from "@x402/stellar/exact/server";
 import { HTTPFacilitatorClient } from "@x402/core/server";
 import { Transaction, Networks } from "@stellar/stellar-sdk";
 import { auditContract } from "./auditor.js";
+import { buildIndex } from "./rag/rag.js";
 import { demoAudit, type PaymentAsset } from "./demo.js";
 import { mppAuditPaywall } from "./mpp.js";
 
@@ -222,4 +223,6 @@ app.listen(Number(PORT), () => {
   console.log(`  POST /api/audit  →  ${AUDIT_PRICE} USDC (stellar:testnet)`);
   console.log(`  payTo: ${STELLAR_ADDRESS}`);
   console.log(`  facilitator: ${FACILITATOR_URL}`);
+  // Build RAG index in background — audit falls back to taxonomy-only if not ready yet
+  buildIndex().catch((err) => console.warn("  [RAG] Index build failed (non-fatal):", err));
 });

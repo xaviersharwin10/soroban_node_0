@@ -1,4 +1,5 @@
 import Groq from "groq-sdk";
+import { retrieve } from "./rag/rag.js";
 
 // ---------------------------------------------------------------------------
 // Soroban Security Auditor
@@ -111,17 +112,20 @@ const PASS2_SYSTEM = `You are an elite Soroban smart contract security auditor. 
 - Val storage corruption → CWE-843 (Access of Resource Using Incompatible Type)
 - Missing events → CWE-223 (Omission of Security-relevant Information)
 
-## SANCTIFIER & CVE REFERENCES
-- S001: https://github.com/OpenZeppelin/stellar-contracts/blob/main/docs/sanctifier/S001.md
-- S002: https://github.com/OpenZeppelin/stellar-contracts/blob/main/docs/sanctifier/S002.md
-- S003: https://github.com/OpenZeppelin/stellar-contracts/blob/main/docs/sanctifier/S003.md
-- S004: https://github.com/OpenZeppelin/stellar-contracts/blob/main/docs/sanctifier/S004.md
-- S005: https://github.com/OpenZeppelin/stellar-contracts/blob/main/docs/sanctifier/S005.md
-- S008: https://github.com/OpenZeppelin/stellar-contracts/blob/main/docs/sanctifier/S008.md
-- S009: https://github.com/OpenZeppelin/stellar-contracts/blob/main/docs/sanctifier/S009.md
-- S010: https://github.com/OpenZeppelin/stellar-contracts/blob/main/docs/sanctifier/S010.md
-- S012: https://github.com/OpenZeppelin/stellar-contracts/blob/main/docs/sanctifier/S012.md
-- GHSA-PM4J-7R4Q-CCG8: https://github.com/advisories/GHSA-pm4j-7r4q-ccg8
+## REFERENCES (use these exact URLs in the references array)
+- Missing require_auth (S001 / CWE-862): https://cwe.mitre.org/data/definitions/862.html
+- Panic / unwrap (S002 / CWE-248): https://cwe.mitre.org/data/definitions/248.html
+- Unchecked arithmetic (S003 / CWE-190): https://cwe.mitre.org/data/definitions/190.html
+- Integer underflow (S003 / CWE-191): https://cwe.mitre.org/data/definitions/191.html
+- Unbounded storage / DoS (S004 / CWE-400): https://cwe.mitre.org/data/definitions/400.html
+- Storage key collision (S005 / CWE-471): https://cwe.mitre.org/data/definitions/471.html
+- Missing events (S008 / CWE-223): https://cwe.mitre.org/data/definitions/223.html
+- Ignored result value (S009 / CWE-252): https://cwe.mitre.org/data/definitions/252.html
+- Admin/upgrade without timelock (S010 / CWE-284): https://cwe.mitre.org/data/definitions/284.html
+- Unvalidated external address (CWE-20): https://cwe.mitre.org/data/definitions/20.html
+- Division by zero (CWE-369): https://cwe.mitre.org/data/definitions/369.html
+- Val storage corruption (GHSA-PM4J-7R4Q-CCG8): https://github.com/advisories/GHSA-pm4j-7r4q-ccg8
+- OpenZeppelin Stellar Contracts: https://github.com/OpenZeppelin/stellar-contracts
 
 ## OUTPUT FORMAT
 
@@ -151,7 +155,7 @@ Example:
     "affected_function": "withdraw",
     "cwe_id": "CWE-862",
     "suggested_fix": "Add \`to.require_auth();\` as the first statement in \`fn withdraw()\` before the storage read and token transfer.",
-    "references": ["https://github.com/OpenZeppelin/stellar-contracts/blob/main/docs/sanctifier/S001.md"]
+    "references": ["https://cwe.mitre.org/data/definitions/862.html"]
   }
 ]`;
 
@@ -185,12 +189,21 @@ export async function auditContract(code: string): Promise<AuditReport> {
   const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
   const userAuditRequest = `Audit the following Soroban smart contract:\n\n\`\`\`rust\n${code}\n\`\`\``;
 
+  // ── RAG: retrieve relevant security documentation ────────────────────────
+  const ragChunks = await retrieve(code, 4);
+  const ragSection =
+    ragChunks.length > 0
+      ? `\n\n## RETRIEVED SECURITY DOCUMENTATION\n\nThe following curated Soroban security knowledge is relevant to this contract. Use it to sharpen your analysis:\n\n${ragChunks.join("\n\n---\n\n")}`
+      : "";
+
+  const pass1System = PASS1_SYSTEM + ragSection;
+
   // ── Pass 1: Chain-of-thought reasoning ──────────────────────────────────
-  console.log(`  [AI] Pass 1: deep reasoning over all functions...`);
+  console.log(`  [AI] Pass 1: deep reasoning over all functions... (${ragChunks.length} RAG chunks injected)`);
   const pass1 = await client.chat.completions.create({
     model: MODEL,
     messages: [
-      { role: "system", content: PASS1_SYSTEM },
+      { role: "system", content: pass1System },
       { role: "user", content: userAuditRequest },
     ],
     max_tokens: 4096,

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsup src/index.ts --format esm --dts",
+    "build": "tsup src/index.ts --format esm --dts --external @xenova/transformers",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
   },
@@ -15,6 +15,7 @@
     "@x402/core": "^2.8.0",
     "@x402/express": "^2.8.0",
     "@x402/stellar": "^2.8.0",
+    "@xenova/transformers": "^2.17.2",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
