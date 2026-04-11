@@ -1,7 +1,9 @@
 import { config as loadEnv } from "dotenv";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir, stat } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { homedir } from "node:os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { wrapFetchWithPayment, x402Client, x402HTTPClient, decodePaymentResponseHeader } from "@x402/fetch";
@@ -62,6 +64,56 @@ const mppClient = MppxClient.create({
 });
 
 // ---------------------------------------------------------------------------
+// Helpers — multi-file loading and report persistence
+// ---------------------------------------------------------------------------
+
+const REPORTS_DIR = join(homedir(), ".auditor-mcp", "reports");
+
+async function findRsFiles(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await findRsFiles(full)));
+    } else if (entry.isFile() && entry.name.endsWith(".rs")) {
+      files.push(full);
+    }
+  }
+  return files.sort();
+}
+
+/** Load one .rs file OR all .rs files in a directory (recursive). */
+async function loadContractCode(
+  filePath: string,
+): Promise<{ code: string; filesAudited: string[] }> {
+  const info = await stat(filePath);
+  if (info.isDirectory()) {
+    const rsFiles = await findRsFiles(filePath);
+    if (rsFiles.length === 0)
+      throw new Error(`No .rs files found in directory: ${filePath}`);
+    const sections = await Promise.all(
+      rsFiles.map(async (f) => {
+        const content = await readFile(f, "utf8");
+        const relative = f.slice(filePath.length).replace(/^\//, "");
+        return `// === FILE: ${relative} ===\n\n${content}`;
+      }),
+    );
+    return { code: sections.join("\n\n"), filesAudited: rsFiles };
+  }
+  const code = await readFile(filePath, "utf8");
+  return { code, filesAudited: [filePath] };
+}
+
+/** Persist a full audit report to ~/.auditor-mcp/reports/<auditId>.json */
+async function saveReport(auditId: string, report: object): Promise<string> {
+  await mkdir(REPORTS_DIR, { recursive: true });
+  const reportPath = join(REPORTS_DIR, `${auditId}.json`);
+  await writeFile(reportPath, JSON.stringify(report, null, 2), "utf8");
+  return reportPath;
+}
+
+// ---------------------------------------------------------------------------
 // MCP server
 // ---------------------------------------------------------------------------
 
@@ -73,34 +125,42 @@ const server = new McpServer({
 server.tool(
   "audit_soroban_contract",
   [
-    "Reads a local Soroban smart contract (.rs file) and submits it for a paid security audit.",
-    "Charges 0.15 USDC on Stellar Testnet via the x402 protocol.",
-    "Returns a structured audit report with vulnerabilities, warnings, and recommendations.",
+    "Reads a local Soroban smart contract and submits it for a paid AI security audit.",
+    "Cost: 0.15 USDC per audit, charged autonomously on Stellar Testnet via the x402 protocol.",
+    "Accepts a single .rs file OR a project directory (all .rs files are included automatically).",
+    "Returns a structured report with CWE IDs, severity levels, fix recommendations,",
+    "a unique audit ID, and a downloadable report saved to ~/.auditor-mcp/reports/.",
   ].join(" "),
   {
     file_path: z
       .string()
-      .describe("Absolute or relative path to the Soroban .rs contract file to audit"),
+      .describe(
+        "Absolute path to a Soroban .rs file, OR a directory containing Soroban contract source files. " +
+        "When a directory is provided, all .rs files are discovered recursively and audited together.",
+      ),
   },
   async ({ file_path }) => {
-    // 1. Read the contract file
+    // 1. Load contract code — single file or full directory
     let code: string;
+    let filesAudited: string[];
     try {
-      code = await readFile(file_path, "utf8");
+      ({ code, filesAudited } = await loadContractCode(file_path));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return {
-        content: [{ type: "text", text: `Failed to read file "${file_path}": ${message}` }],
+        content: [{ type: "text", text: `Failed to read "${file_path}": ${message}` }],
         isError: true,
       };
     }
 
     if (code.trim().length === 0) {
       return {
-        content: [{ type: "text", text: `File "${file_path}" is empty.` }],
+        content: [{ type: "text", text: `No contract code found at "${file_path}".` }],
         isError: true,
       };
     }
+
+    const auditId = randomUUID();
 
     // 2. POST to auditor-backend — x402 payment handshake is handled automatically:
     //    - fetchWithPayment sends the initial request
@@ -177,24 +237,29 @@ server.tool(
       .map((s) => `${s}: ${counts[s]}`)
       .join(" | ");
 
+    const output = {
+      auditId,
+      file: file_path,
+      filesAudited,
+      protocol: "x402 / Stellar Testnet",
+      walletAddress: signer.address,
+      stellarTxUrl,
+      model: report?.model,
+      summary: summary || "No vulnerabilities found",
+      findings,
+      reasoning: report?.reasoning ?? null,
+    };
+
+    let reportFile: string | null = null;
+    try {
+      reportFile = await saveReport(auditId, output);
+    } catch { /* non-fatal — report still returned inline */ }
+
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify(
-            {
-              file: file_path,
-              protocol: "x402 / Stellar Testnet",
-              walletAddress: signer.address,
-              stellarTxUrl,
-              model: report?.model,
-              summary: summary || "No vulnerabilities found",
-              findings,
-              reasoning: report?.reasoning ?? null,
-            },
-            null,
-            2,
-          ),
+          text: JSON.stringify({ ...output, reportFile }, null, 2),
         },
       ],
     };
@@ -208,33 +273,41 @@ server.tool(
 server.tool(
   "audit_soroban_contract_mpp",
   [
-    "Reads a local Soroban smart contract (.rs file) and submits it for a paid security audit.",
-    "Charges 0.15 USDC on Stellar Testnet via the Stripe Machine Payments Protocol (MPP).",
-    "Returns a structured audit report with vulnerabilities, CWE IDs, severity levels, and fixes.",
+    "Reads a local Soroban smart contract and submits it for a paid AI security audit.",
+    "Cost: 0.15 USDC per audit, charged autonomously on Stellar Testnet via the Stripe Machine Payments Protocol (MPP).",
+    "Accepts a single .rs file OR a project directory (all .rs files are included automatically).",
+    "Returns a structured report with CWE IDs, severity levels, fix recommendations,",
+    "a unique audit ID, and a downloadable report saved to ~/.auditor-mcp/reports/.",
   ].join(" "),
   {
     file_path: z
       .string()
-      .describe("Absolute or relative path to the Soroban .rs contract file to audit"),
+      .describe(
+        "Absolute path to a Soroban .rs file, OR a directory containing Soroban contract source files. " +
+        "When a directory is provided, all .rs files are discovered recursively and audited together.",
+      ),
   },
   async ({ file_path }) => {
     let code: string;
+    let filesAudited: string[];
     try {
-      code = await readFile(file_path, "utf8");
+      ({ code, filesAudited } = await loadContractCode(file_path));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return {
-        content: [{ type: "text", text: `Failed to read file "${file_path}": ${message}` }],
+        content: [{ type: "text", text: `Failed to read "${file_path}": ${message}` }],
         isError: true,
       };
     }
 
     if (code.trim().length === 0) {
       return {
-        content: [{ type: "text", text: `File "${file_path}" is empty.` }],
+        content: [{ type: "text", text: `No contract code found at "${file_path}".` }],
         isError: true,
       };
     }
+
+    const auditId = randomUUID();
 
     // mppClient.fetch handles the MPP 402 challenge automatically:
     //   - receives HTTP 402 with Stellar payment challenge
@@ -312,24 +385,29 @@ server.tool(
       .map((s) => `${s}: ${counts[s]}`)
       .join(" | ");
 
+    const output = {
+      auditId,
+      file: file_path,
+      filesAudited,
+      protocol: "Stripe MPP / Stellar Testnet",
+      walletAddress: signer.address,
+      stellarTxUrl: mppStellarTxUrl,
+      model: report?.model,
+      summary: summary || "No vulnerabilities found",
+      findings,
+      reasoning: report?.reasoning ?? null,
+    };
+
+    let reportFile: string | null = null;
+    try {
+      reportFile = await saveReport(auditId, output);
+    } catch { /* non-fatal — report still returned inline */ }
+
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify(
-            {
-              file: file_path,
-              protocol: "Stripe MPP / Stellar Testnet",
-              walletAddress: signer.address,
-              stellarTxUrl: mppStellarTxUrl,
-              model: report?.model,
-              summary: summary || "No vulnerabilities found",
-              findings,
-              reasoning: report?.reasoning ?? null,
-            },
-            null,
-            2,
-          ),
+          text: JSON.stringify({ ...output, reportFile }, null, 2),
         },
       ],
     };
