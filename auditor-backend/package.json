@@ -20,14 +20,14 @@
     "express": "^5.2.1",
     "groq-sdk": "^1.1.2",
     "mppx": "^0.5.9",
-    "stripe": "^22.0.1"
+    "stripe": "^22.0.1",
+    "tsup": "^8.5.1",
+    "typescript": "^5.7.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
-    "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.7.0"
+    "tsx": "^4.21.0"
   }
 }
