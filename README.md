@@ -55,6 +55,7 @@ Both tools return:
   "file": "/path/to/contract.rs",
   "protocol": "Stripe MPP / Stellar Testnet",
   "walletAddress": "GDEMO...",
+  "stellarTxUrl": "https://stellar.expert/explorer/testnet/tx/abc123...",
   "model": "llama-3.3-70b-versatile",
   "summary": "CRITICAL: 1 | HIGH: 2",
   "findings": [
@@ -62,14 +63,17 @@ Both tools return:
       "vulnerability_type": "Missing require_auth",
       "severity": "CRITICAL",
       "confidence": 100,
-      "affected_function": "withdraw",
+      "affected_function": "liquidate",
       "cwe_id": "CWE-862",
-      "suggested_fix": "Add `to.require_auth();` as the first statement in `fn withdraw()` before any storage reads.",
+      "suggested_fix": "Add `liquidator.require_auth();` as the first statement in `fn liquidate()` before any storage reads or token transfers.",
       "references": ["https://github.com/OpenZeppelin/stellar-contracts/blob/main/docs/sanctifier/S001.md"]
     }
-  ]
+  ],
+  "reasoning": "## Authorization trace\nfn liquidate(): modifies state (removes position) and transfers tokens, but has NO require_auth() call. This is a CRITICAL missing authorization — any caller can liquidate any position and collect the collateral without repaying the debt..."
 }
 ```
+
+The `reasoning` field contains the full chain-of-thought analysis from the AI's first pass — showing exactly how each vulnerability was identified. This is your audit trail.
 
 ---
 
@@ -148,6 +152,16 @@ Audit /path/to/my_contract.rs for vulnerabilities using the Soroban auditor
 
 The agent will automatically pay 0.15 USDC on Stellar Testnet and return findings. No human approves the payment.
 
+To try the included sample contracts:
+
+```
+Audit /path/to/stellar/contracts/defi_lending.rs using the Soroban auditor
+```
+
+```
+Use audit_soroban_contract_mpp to audit /path/to/stellar/contracts/dao_governance.rs
+```
+
 ---
 
 ## Project Structure
@@ -168,7 +182,13 @@ stellar/
 │   │   └── stellar/          # x402 Stellar client implementation
 │   └── .env.example
 │
-└── test_contract.rs          # Intentionally vulnerable vault contract (for demo)
+└── contracts/                # Sample Soroban contracts for demo and testing
+    ├── defi_lending.rs       # Overcollateralized lending — missing auth on liquidate, overflow
+    ├── token_bridge.rs       # Cross-chain bridge — unvalidated token address, missing events
+    ├── staking_rewards.rs    # Yield farming — unbounded Instance storage, TTL mismanagement
+    ├── nft_marketplace.rs    # NFT marketplace — cancel auth bypass, upgrade without timelock
+    ├── dao_governance.rs     # DAO voting — missing execute auth, unbounded vote storage
+    └── yield_aggregator.rs   # Auto-compounding vault — unauthorized harvest, overflow
 ```
 
 ---
