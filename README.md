@@ -118,33 +118,25 @@ npm install
 npm run dev
 ```
 
-### 2. MCP Server
+### 2. Configure Claude Code (or any MCP-compatible agent)
 
-```bash
-cd auditor-mcp
-cp .env.example .env
-# Fill in: STELLAR_SECRET_KEY (funded Stellar testnet keypair with USDC trustline)
-npm install
-npm run build
-```
-
-### 3. Configure Claude Code (or any MCP-compatible agent)
+No install needed — `npx` pulls the package automatically:
 
 ```json
 {
   "mcpServers": {
     "auditor-mcp": {
-      "command": "node",
-      "args": ["/absolute/path/to/auditor-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "auditor-mcp"],
       "env": {
-        "STELLAR_SECRET_KEY": "your-stellar-secret-key",
-        "AUDIT_GATEWAY_URL": "http://localhost:3001/api/audit",
-        "MPP_AUDIT_GATEWAY_URL": "http://localhost:3001/api/audit/mpp"
+        "STELLAR_SECRET_KEY": "your-stellar-secret-key"
       }
     }
   }
 }
 ```
+
+`STELLAR_SECRET_KEY` must be a funded Stellar Testnet keypair with a USDC trustline. The MCP connects to the hosted backend automatically — no other config needed.
 
 ### 4. Run an Audit
 

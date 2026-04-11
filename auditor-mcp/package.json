@@ -1,10 +1,32 @@
 {
   "name": "auditor-mcp",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
-  "description": "MCP server that audits Soroban smart contracts via x402 pay-as-you-go",
+  "description": "MCP server that audits Soroban smart contracts via autonomous x402 / Stripe MPP payments on Stellar Testnet",
+  "keywords": [
+    "mcp",
+    "soroban",
+    "stellar",
+    "x402",
+    "security",
+    "audit",
+    "smart-contract"
+  ],
+  "author": "xaviersharwin10",
+  "license": "MIT",
+  "homepage": "https://github.com/xaviersharwin10/soroban_node_0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xaviersharwin10/soroban_node_0.git"
+  },
+  "bin": {
+    "auditor-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "tsup src/index.ts --format esm",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit"
   },
@@ -16,12 +38,13 @@
     "@x402/fetch": "^2.8.0",
     "dotenv": "^17.3.1",
     "mppx": "^0.4.12",
+    "tsup": "^8.5.1",
+    "typescript": "^5.7.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "tsx": "^4.21.0",
-    "typescript": "^5.7.0"
+    "tsx": "^4.21.0"
   },
   "engines": {
     "node": ">=20"
