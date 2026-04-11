@@ -124,11 +124,11 @@ app.post("/api/audit", async (req, res) => {
   }
 
   // Payment has been verified by x402 middleware at this point.
+  // Note: the real on-chain tx hash is returned in the PAYMENT-RESPONSE header by the
+  // x402 middleware after settlement — the client extracts it from there, not here.
   try {
     const report = await auditContract(code);
-    const txUrl = extractStellarTxUrl(req, "x402");
-    if (txUrl) console.log(`  [x402] Stellar tx: ${txUrl}`);
-    res.json({ ...report, stellarTxUrl: txUrl });
+    res.json(report);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Audit error:", message);

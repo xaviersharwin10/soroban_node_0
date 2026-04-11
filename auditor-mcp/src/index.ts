@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { wrapFetchWithPayment, x402Client, x402HTTPClient } from "@x402/fetch";
+import { wrapFetchWithPayment, x402Client, x402HTTPClient, decodePaymentResponseHeader } from "@x402/fetch";
 import { Mppx as MppxClient } from "mppx/client";
 import { stellar as stellarMpp } from "@stellar/mpp/charge/client";
 import { z } from "zod";
@@ -126,6 +126,19 @@ server.tool(
       };
     }
 
+    // 3. Extract real on-chain tx hash from PAYMENT-RESPONSE header (set by x402 middleware
+    //    after the facilitator submits the transaction to Stellar post-settlement).
+    let stellarTxUrl: string | null = null;
+    try {
+      const paymentResponseHeader = response.headers.get("PAYMENT-RESPONSE");
+      if (paymentResponseHeader) {
+        const settlement = decodePaymentResponseHeader(paymentResponseHeader);
+        if (settlement && typeof (settlement as any).transaction === "string" && (settlement as any).transaction) {
+          stellarTxUrl = `https://stellar.expert/explorer/testnet/tx/${(settlement as any).transaction}`;
+        }
+      }
+    } catch { /* ignore — stellarTxUrl stays null */ }
+
     const rawBody = await response.text();
 
     if (!response.ok) {
@@ -140,7 +153,7 @@ server.tool(
       };
     }
 
-    // 3. Parse and surface the audit result
+    // 4. Parse and surface the audit result
     let report: { findings: unknown[]; model?: string; reasoning?: string } | null = null;
     try {
       report = JSON.parse(rawBody);
@@ -173,7 +186,7 @@ server.tool(
               file: file_path,
               protocol: "x402 / Stellar Testnet",
               walletAddress: signer.address,
-              stellarTxUrl: (report as any)?.stellarTxUrl ?? null,
+              stellarTxUrl,
               model: report?.model,
               summary: summary || "No vulnerabilities found",
               findings,
