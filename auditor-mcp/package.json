@@ -1,6 +1,6 @@
 {
   "name": "auditor-mcp",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "type": "module",
   "description": "MCP server that audits Soroban smart contracts via autonomous x402 / Stripe MPP payments on Stellar Testnet",
   "keywords": [

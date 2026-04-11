@@ -1,9 +1,8 @@
 import { config as loadEnv } from "dotenv";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFile, writeFile, mkdir, readdir, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { homedir } from "node:os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { wrapFetchWithPayment, x402Client, x402HTTPClient, decodePaymentResponseHeader } from "@x402/fetch";
@@ -64,10 +63,8 @@ const mppClient = MppxClient.create({
 });
 
 // ---------------------------------------------------------------------------
-// Helpers — multi-file loading and report persistence
+// Helpers — multi-file loading
 // ---------------------------------------------------------------------------
-
-const REPORTS_DIR = join(homedir(), ".auditor-mcp", "reports");
 
 async function findRsFiles(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -103,14 +100,6 @@ async function loadContractCode(
   }
   const code = await readFile(filePath, "utf8");
   return { code, filesAudited: [filePath] };
-}
-
-/** Persist a full audit report to ~/.auditor-mcp/reports/<auditId>.json */
-async function saveReport(auditId: string, report: object): Promise<string> {
-  await mkdir(REPORTS_DIR, { recursive: true });
-  const reportPath = join(REPORTS_DIR, `${auditId}.json`);
-  await writeFile(reportPath, JSON.stringify(report, null, 2), "utf8");
-  return reportPath;
 }
 
 // ---------------------------------------------------------------------------
@@ -250,16 +239,11 @@ server.tool(
       reasoning: report?.reasoning ?? null,
     };
 
-    let reportFile: string | null = null;
-    try {
-      reportFile = await saveReport(auditId, output);
-    } catch { /* non-fatal — report still returned inline */ }
-
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify({ ...output, reportFile }, null, 2),
+          text: JSON.stringify(output, null, 2),
         },
       ],
     };
@@ -398,16 +382,11 @@ server.tool(
       reasoning: report?.reasoning ?? null,
     };
 
-    let reportFile: string | null = null;
-    try {
-      reportFile = await saveReport(auditId, output);
-    } catch { /* non-fatal — report still returned inline */ }
-
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify({ ...output, reportFile }, null, 2),
+          text: JSON.stringify(output, null, 2),
         },
       ],
     };

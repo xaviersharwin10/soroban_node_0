@@ -8,7 +8,8 @@ MCP server that audits Soroban smart contracts via autonomous on-chain payments 
 2. The agent sends the contract to the auditor gateway
 3. The gateway returns **HTTP 402 Payment Required**
 4. The agent autonomously pays **0.15 USDC on Stellar Testnet** and retries
-5. A two-pass AI engine (chain-of-thought + structured output) returns a full security report
+5. The backend retrieves relevant security documentation via RAG (local embeddings, no API key)
+6. A two-pass AI engine (chain-of-thought + structured output) returns a full security report
 
 No human touches a wallet.
 
@@ -75,12 +76,9 @@ Both tools accept:
       "references": ["https://cwe.mitre.org/data/definitions/862.html"]
     }
   ],
-  "reasoning": "## Authorization trace\nfn execute(): modifies state and triggers cross-contract call, but has NO require_auth()...",
-  "reportFile": "/home/user/.auditor-mcp/reports/a1b2c3d4-....json"
+  "reasoning": "## Authorization trace\nfn execute(): modifies state and triggers cross-contract call, but has NO require_auth()..."
 }
 ```
-
-Every audit is saved to `~/.auditor-mcp/reports/<auditId>.json` with a unique ID for traceability.
 
 ## Audit Coverage
 
