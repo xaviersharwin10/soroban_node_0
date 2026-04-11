@@ -16,8 +16,8 @@ import { mppAuditPaywall } from "./mpp.js";
 function extractStellarTxUrl(req: express.Request, protocol: "x402" | "mpp"): string | null {
   try {
     if (protocol === "x402") {
-      // X-PAYMENT header contains the payment proof (base64-encoded JSON or raw JSON)
-      const raw = req.headers["x-payment"] as string | undefined;
+      // x402 v2 uses PAYMENT-SIGNATURE header; v1 uses X-PAYMENT
+      const raw = (req.headers["payment-signature"] || req.headers["x-payment"]) as string | undefined;
       if (!raw) return null;
       let parsed: any;
       try { parsed = JSON.parse(raw); } catch {

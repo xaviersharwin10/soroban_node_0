@@ -292,6 +292,7 @@ server.tool(
               file: file_path,
               protocol: "Stripe MPP / Stellar Testnet",
               walletAddress: signer.address,
+              stellarTxUrl: (report as any)?.stellarTxUrl ?? null,
               model: report?.model,
               summary: summary || "No vulnerabilities found",
               findings,
