@@ -54,7 +54,9 @@ Audits a local `.rs` file via the **Stripe Machine Payments Protocol**. Pays 0.1
 Both tools return:
 ```json
 {
+  "auditId": "a1b2c3d4-...",
   "file": "/path/to/contract.rs",
+  "filesAudited": ["/path/to/contract.rs"],
   "protocol": "Stripe MPP / Stellar Testnet",
   "walletAddress": "GDEMO...",
   "stellarTxUrl": "https://stellar.expert/explorer/testnet/tx/abc123...",

@@ -74,7 +74,10 @@ No intro slide. Start directly on the code.
 > "Here's the full system. The MCP agent sends the contract to our gateway.
 > The gateway returns HTTP 402 — payment required.
 > The agent autonomously signs a Stellar transaction, pays 0.15 USDC, and retries.
-> Once payment is verified on-chain, the contract goes to a two-pass AI audit engine:
+> Once payment is verified on-chain, the backend runs a local RAG retrieval step —
+> it embeds the contract code and finds the most relevant security docs from our
+> curated Soroban knowledge base, using a model that runs entirely on the server,
+> no API key needed. Those chunks are injected into a two-pass AI audit engine:
 > first a deep reasoning pass, then structured findings with CWE IDs and exact fixes.
 > No human approves anything."
 
@@ -137,13 +140,13 @@ Use audit_soroban_contract to audit /home/sharwin/stellar/contracts/dao_governan
 
 ---
 
-## [1:50 – 2:05] SHOW THE REPORT FILE
+## [1:50 – 2:05] SHOW THE AUDIT ID
 
-**SCREEN:** Back to Claude Code output — zoom in on `reportFile` path and `auditId`
+**SCREEN:** Back to Claude Code output — zoom in on `auditId` and `filesAudited`
 
 **SAY:**
-> "Every audit gets a unique ID and the full report is saved locally as JSON.
-> Permanent paper trail for every contract, every payment, every finding."
+> "Every audit gets a unique ID. If you audited a full directory, every file is listed
+> in filesAudited — the whole project gets one payment, one report, one on-chain receipt."
 
 ---
 
