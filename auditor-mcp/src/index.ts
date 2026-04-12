@@ -29,9 +29,9 @@ function requireEnv(name: string): string {
 
 const STELLAR_SECRET_KEY = requireEnv("STELLAR_SECRET_KEY");
 const AUDIT_GATEWAY_URL =
-  process.env.AUDIT_GATEWAY_URL?.trim() || "https://soroban-node-0.onrender.com/api/audit";
+  process.env.AUDIT_GATEWAY_URL?.trim() || "https://sorobannode0-production.up.railway.app/api/audit";
 const MPP_GATEWAY_URL =
-  process.env.MPP_AUDIT_GATEWAY_URL?.trim() || "https://soroban-node-0.onrender.com/api/audit/mpp";
+  process.env.MPP_AUDIT_GATEWAY_URL?.trim() || "https://sorobannode0-production.up.railway.app/api/audit/mpp";
 
 const rawNetwork = (process.env.STELLAR_NETWORK ?? STELLAR_TESTNET_CAIP2).trim();
 if (rawNetwork !== STELLAR_TESTNET_CAIP2 && rawNetwork !== STELLAR_PUBNET_CAIP2) {
