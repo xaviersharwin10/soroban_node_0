@@ -4,6 +4,8 @@
 
 Built for **[Stellar Hacks: Agents](https://dorahacks.io/hackathon/stellar-agents-x402-stripe-mpp/detail)** — April 2026.
 
+**npm:** [auditor-mcp](https://www.npmjs.com/package/auditor-mcp)
+
 ---
 
 ## Demo Video
