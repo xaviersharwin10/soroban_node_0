@@ -8,7 +8,7 @@ Built for **[Stellar Hacks: Agents](https://dorahacks.io/hackathon/stellar-agent
 
 ## Demo Video
 
-[![Demo Video](https://img.youtube.com/vi/3j3tb_MzW5w/maxresdefault.jpg)](https://youtu.be/3j3tb_MzW5w?si=o8K1YhYxbA1X7tm0)
+[Watch on YouTube](https://youtu.be/3j3tb_MzW5w?si=o8K1YhYxbA1X7tm0)
 
 ---
 
@@ -24,12 +24,12 @@ The backend grounds every audit in curated Soroban security knowledge via a **lo
 
 These are real on-chain payments made autonomously by the AI agent during development and testing. No human signed these.
 
-| # | Transaction | Protocol |
-|---|---|---|
-| 1 | [9fb39f21...](https://stellar.expert/explorer/testnet/tx/9fb39f21bcbce4c2ff2a83f9c5dc4b3a6d25d22b68217db70af7d650c495332c) | x402 |
-| 2 | [520d4231...](https://stellar.expert/explorer/testnet/tx/520d4231ea22689e0730df16d1ed7822c7add6a1a81b61413d6c3a0e839e8096) | x402 |
-| 3 | [70624854...](https://stellar.expert/explorer/testnet/tx/70624854692579889684f6f1b86238de892ac3e4a2f87caf12e8633ba9be15f6) | Stripe MPP |
-| 4 | [92e0679a...](https://stellar.expert/explorer/testnet/tx/92e0679a05b9be0ba21773a9008d59dc1ad0008694b86a927cb02185bbbf5f56) | Stripe MPP |
+| # | Transaction |
+|---|---|
+| 1 | [9fb39f21...](https://stellar.expert/explorer/testnet/tx/9fb39f21bcbce4c2ff2a83f9c5dc4b3a6d25d22b68217db70af7d650c495332c) |
+| 2 | [520d4231...](https://stellar.expert/explorer/testnet/tx/520d4231ea22689e0730df16d1ed7822c7add6a1a81b61413d6c3a0e839e8096) |
+| 3 | [70624854...](https://stellar.expert/explorer/testnet/tx/70624854692579889684f6f1b86238de892ac3e4a2f87caf12e8633ba9be15f6) |
+| 4 | [92e0679a...](https://stellar.expert/explorer/testnet/tx/92e0679a05b9be0ba21773a9008d59dc1ad0008694b86a927cb02185bbbf5f56) |
 
 ---
 
@@ -55,14 +55,17 @@ These are real on-chain payments made autonomously by the AI agent during develo
 
 ### Step 1 — Get a funded Stellar Testnet wallet
 
-You need a Stellar Testnet keypair with a USDC trustline. The easiest way:
+The easiest way is the **[Stellar Sponsored Agent Account](https://github.com/oceans404/stellar-sponsored-agent-account)** — it gives any AI agent a Stellar USDC wallet in under a minute, with no XLM required upfront. Stellar's native sponsorship protocol covers the ~1.5 XLM account setup cost automatically.
 
-1. Go to [Stellar Laboratory](https://laboratory.stellar.org/#account-creator?network=test) and generate a keypair
-2. Fund it with Friendbot (free testnet XLM — button on the same page)
-3. Add a USDC trustline at [Stellar Laboratory → Transactions → Build Transaction](https://laboratory.stellar.org)
-4. Get free testnet USDC from [Circle's testnet faucet](https://faucet.circle.com) — select **Stellar Testnet**
+Just tell Claude or your agent:
 
-You'll end up with a secret key starting with `S...` and at least 1 USDC. That's all you need.
+```
+Create a Stellar account for USDC
+```
+
+using the skill at `https://stellar-sponsored-agent-account.onrender.com/SKILL.md`
+
+You'll end up with a secret key starting with `S...` and testnet USDC ready to spend. That's all you need.
 
 ### Step 2 — Add to your MCP config
 
@@ -218,44 +221,6 @@ stellar/
     ├── nft_marketplace.rs    # NFT marketplace — cancel auth bypass, upgrade without timelock
     ├── dao_governance.rs     # DAO voting — missing execute auth, unbounded vote storage
     └── yield_aggregator.rs   # Auto-compounding vault — unauthorized harvest, overflow
-```
-
----
-
-## Self-Hosting the Backend
-
-If you want to run your own backend instead of using the hosted version:
-
-```bash
-cd auditor-backend
-cp .env.example .env
-# Edit .env — see Environment Variables below
-npm install
-npm run dev        # development
-npm run build && npm start   # production
-```
-
-### Environment Variables — `auditor-backend/.env`
-
-| Variable | Required | Description |
-|---|---|---|
-| `TESTNET_SERVER_STELLAR_ADDRESS` | Yes | Your Stellar Testnet public key (receives payments) |
-| `TESTNET_FACILITATOR_URL` | Yes | `https://channels.openzeppelin.com/x402/testnet` |
-| `TESTNET_FACILITATOR_API_KEY` | Yes | From [channels.openzeppelin.com](https://channels.openzeppelin.com/testnet/gen) |
-| `GROQ_API_KEY` | Yes | From [console.groq.com/keys](https://console.groq.com/keys) (free tier) |
-| `GROQ_MODEL` | No | `llama-3.3-70b-versatile` (default) |
-| `MPP_SECRET_KEY` | Yes | Any strong random string — signs MPP payment challenges |
-| `DEMO_CLIENT_STELLAR_SECRET` | No | Demo wallet secret key (for web UI demo endpoint) |
-| `PORT` | No | `3001` (default) |
-
-Point `auditor-mcp` at your local backend by setting these in `.mcp.json`:
-
-```json
-"env": {
-  "STELLAR_SECRET_KEY": "your-key",
-  "AUDIT_GATEWAY_URL": "http://localhost:3001/api/audit",
-  "MPP_AUDIT_GATEWAY_URL": "http://localhost:3001/api/audit/mpp"
-}
 ```
 
 ---
